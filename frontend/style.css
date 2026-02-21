@@ -403,15 +403,41 @@ body {
   border-bottom-left-radius: 4px;
 }
 
-.message-time {
-  font-size: 10px;
-  color: var(--text-muted);
+.message-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 4px;
   padding: 0 4px;
 }
 
-.message.user .message-time {
-  text-align: right;
+.message-time {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.message.user .message-meta {
+  justify-content: flex-end;
+}
+
+.btn-listen {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: var(--accent);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 3px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.btn-listen:hover,
+.btn-listen:active {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+  transform: scale(1.05);
 }
 
 /* Typing indicator */
@@ -888,8 +914,15 @@ body {
 }
 
 @keyframes bounceIcon {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
 }
 
 .install-banner-text {

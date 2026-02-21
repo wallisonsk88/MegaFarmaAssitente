@@ -97,11 +97,19 @@ function addMessage(role, text, imageData = null) {
     .replace(/\n/g, '<br>');
   contentHTML += formattedText;
 
+  // Add listen button for bot messages
+  const listenBtnHtml = role === 'bot'
+    ? `<button class="btn-listen" onclick="speakText(this.dataset.text)" data-text="${text.replace(/"/g, '&quot;')}">🔊 Ouvir</button>`
+    : '';
+
   div.innerHTML = `
     <div class="message-avatar">${avatarHtml}</div>
     <div>
       <div class="bubble">${contentHTML}</div>
-      <div class="message-time">${getTime()}</div>
+      <div class="message-meta">
+        <span class="message-time">${getTime()}</span>
+        ${listenBtnHtml}
+      </div>
     </div>
   `;
 
@@ -208,16 +216,19 @@ let ttsKeepAliveTimer = null;
 // Warm-up: unlock TTS on first user interaction (required for mobile)
 function unlockTTS() {
   if (ttsUnlocked || !('speechSynthesis' in window)) return;
-  const silentUtterance = new SpeechSynthesisUtterance('');
-  silentUtterance.volume = 0;
-  silentUtterance.lang = 'pt-BR';
-  window.speechSynthesis.speak(silentUtterance);
+  // Speak a short real word (empty string fails on some Android devices)
+  const warmup = new SpeechSynthesisUtterance('.');
+  warmup.volume = 0.01; // near-silent but not zero (zero fails on some devices)
+  warmup.lang = 'pt-BR';
+  warmup.rate = 10; // speak as fast as possible
+  window.speechSynthesis.speak(warmup);
   ttsUnlocked = true;
+  console.log('[TTS] Audio unlocked');
 }
 
 // Unlock on any user interaction
-['click', 'touchstart', 'keydown'].forEach(evt => {
-  document.addEventListener(evt, unlockTTS, { once: true });
+['click', 'touchstart', 'touchend', 'keydown'].forEach(evt => {
+  document.addEventListener(evt, unlockTTS, { once: false });
 });
 
 // Dictionary to fix common mispronunciations
@@ -290,7 +301,11 @@ function stopKeepAlive() {
 }
 
 function speakText(text) {
-  if (!('speechSynthesis' in window)) return;
+  if (!('speechSynthesis' in window)) {
+    console.log('[TTS] speechSynthesis not supported');
+    return;
+  }
+
   window.speechSynthesis.cancel();
   stopKeepAlive();
 
@@ -299,6 +314,8 @@ function speakText(text) {
 
   const chunks = splitTextIntoChunks(cleanText);
   const voice = findFeminineVoice();
+
+  console.log('[TTS] Speaking', chunks.length, 'chunks. Voice:', voice ? voice.name : 'default');
 
   function speakChunk(index) {
     if (index >= chunks.length) {
@@ -320,7 +337,8 @@ function speakText(text) {
     }
 
     utterance.onend = () => speakChunk(index + 1);
-    utterance.onerror = () => {
+    utterance.onerror = (e) => {
+      console.log('[TTS] Error on chunk', index, e.error);
       stopKeepAlive();
       // Retry once on error (common on mobile)
       if (index === 0 && chunks.length > 0) {
@@ -340,7 +358,8 @@ function speakText(text) {
   }
 
   startKeepAlive();
-  speakChunk(0);
+  // Delay after cancel() — critical fix for Android Chrome
+  setTimeout(() => speakChunk(0), 150);
 }
 
 function findFeminineVoice() {
