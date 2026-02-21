@@ -296,7 +296,12 @@ function setupSpeechRecognition() {
 function startListening() {
   if (!recognition) recognition = setupSpeechRecognition();
   if (!recognition) {
-    showToast('Reconhecimento de voz não suportado neste navegador');
+    // Check if HTTPS is missing (required for mic on mobile)
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      showToast('Microfone requer HTTPS. Peça ao administrador para ativar SSL.');
+    } else {
+      showToast('Reconhecimento de voz não suportado neste navegador');
+    }
     return;
   }
   showChat();
