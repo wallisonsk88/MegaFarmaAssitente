@@ -5,7 +5,7 @@ Assistente Digital MegaFarma — FastAPI Backend
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from typing import Optional
 import os
@@ -13,6 +13,7 @@ import base64
 
 from config import get_config, save_config
 from services.ai_provider import chat as ai_chat
+from services.tts_service import generate_speech
 
 app = FastAPI(title="Assistente Digital MegaFarma")
 
@@ -41,6 +42,10 @@ class ConfigUpdate(BaseModel):
     API_KEY: Optional[str] = None
     MODEL_NAME: Optional[str] = None
     MODEL_PROVIDER: Optional[str] = None
+
+
+class TTSRequest(BaseModel):
+    text: str = Field(..., max_length=5000)
 
 
 # ── Endpoints ───────────────────────────────────────────────────────────────────
@@ -81,6 +86,22 @@ async def chat_endpoint(req: ChatRequest):
     )
 
     return {"response": response_text}
+
+
+@app.post("/tts")
+async def tts_endpoint(req: TTSRequest):
+    """Generate speech audio from text using Microsoft Neural TTS."""
+    try:
+        audio_data = await generate_speech(req.text)
+        if not audio_data:
+            return JSONResponse(status_code=400, content={"error": "Texto vazio."})
+        return Response(
+            content=audio_data,
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": "inline; filename=speech.mp3"}
+        )
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Erro ao gerar áudio: {str(e)}"})
 
 
 @app.get("/config")
@@ -124,3 +145,4 @@ async def serve_index():
 
 # Mount static files AFTER specific routes
 app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
+

@@ -37,7 +37,7 @@ self.addEventListener('fetch', (event) => {
     }
 
     // Skip API calls — always go to network and don't cache
-    if (url.includes('/chat') || url.includes('/config')) {
+    if (url.includes('/chat') || url.includes('/config') || url.includes('/tts')) {
         return;
     }
 

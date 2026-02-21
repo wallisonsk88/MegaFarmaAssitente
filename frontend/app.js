@@ -76,6 +76,7 @@ function newChat() {
   couponBar.classList.remove('visible');
   welcomeScreen.classList.remove('hidden');
   chatContainer.classList.remove('active');
+  if (typeof stopAudio === 'function') stopAudio();
 }
 
 // ── Add Message ────────────────────────────────────────────────
@@ -208,203 +209,63 @@ async function sendMessage() {
   }
 }
 
-// ── TTS (Mobile-Compatible) ────────────────────────────────────
-let cachedFeminineVoice = null;
-let ttsUnlocked = false;
-let ttsKeepAliveTimer = null;
+// ── TTS (Neural Voice via Backend) ─────────────────────────────
+let currentAudio = null;
 
-// Warm-up: unlock TTS on first user interaction (required for mobile)
-function unlockTTS() {
-  if (ttsUnlocked || !('speechSynthesis' in window)) return;
-  // Speak a short real word (empty string fails on some Android devices)
-  const warmup = new SpeechSynthesisUtterance('.');
-  warmup.volume = 0.01; // near-silent but not zero (zero fails on some devices)
-  warmup.lang = 'pt-BR';
-  warmup.rate = 10; // speak as fast as possible
-  window.speechSynthesis.speak(warmup);
-  ttsUnlocked = true;
-  console.log('[TTS] Audio unlocked');
-}
-
-// Unlock on any user interaction
-['click', 'touchstart', 'touchend', 'keydown'].forEach(evt => {
-  document.addEventListener(evt, unlockTTS, { once: false });
-});
-
-// Dictionary to fix common mispronunciations
-const phoneticMap = {
-  'MIPs': 'remédios isentos de receita',
-  'MIP': 'remédio isento de receita',
-  'MegaFarma': 'Mega Farma',
-  'AI': 'inteligência artificial',
-  'bot': 'assistente',
-  'mg': 'miligramas',
-  'mcg': 'microgramas',
-  'ml': 'mililitros',
-};
-
-function cleanTextForTTS(text) {
-  let clean = text
-    .replace(/[*_~`#>]/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/\n{2,}/g, '. ')
-    .replace(/\n/g, ', ')
-    .trim();
-
-  // Apply phonetic fixes
-  Object.keys(phoneticMap).forEach(key => {
-    const reg = new RegExp(`\\b${key}\\b`, 'gi');
-    clean = clean.replace(reg, phoneticMap[key]);
-  });
-
-  return clean;
-}
-
-// Split long text into chunks to avoid Chrome Mobile bug that stops speaking
-function splitTextIntoChunks(text, maxLength = 200) {
-  if (text.length <= maxLength) return [text];
-
-  const chunks = [];
-  // Split by sentences first
-  const sentences = text.split(/(?<=[.!?;])\s+/);
-  let current = '';
-
-  for (const sentence of sentences) {
-    if ((current + ' ' + sentence).trim().length > maxLength && current) {
-      chunks.push(current.trim());
-      current = sentence;
-    } else {
-      current = current ? current + ' ' + sentence : sentence;
-    }
-  }
-  if (current.trim()) chunks.push(current.trim());
-
-  return chunks;
-}
-
-// Chrome Mobile bug: speechSynthesis pauses after ~15s. This keeps it alive.
-function startKeepAlive() {
-  stopKeepAlive();
-  ttsKeepAliveTimer = setInterval(() => {
-    if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
-      window.speechSynthesis.pause();
-      window.speechSynthesis.resume();
-    }
-  }, 10000); // Every 10 seconds
-}
-
-function stopKeepAlive() {
-  if (ttsKeepAliveTimer) {
-    clearInterval(ttsKeepAliveTimer);
-    ttsKeepAliveTimer = null;
-  }
-}
-
-function speakText(text) {
-  if (!('speechSynthesis' in window)) {
-    console.log('[TTS] speechSynthesis not supported');
-    return;
+async function speakText(text) {
+  // Stop any currently playing audio
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
   }
 
-  window.speechSynthesis.cancel();
-  stopKeepAlive();
+  if (!text || !text.trim()) return;
 
-  const cleanText = cleanTextForTTS(text);
-  if (!cleanText) return;
+  // Update listen button state
+  const btns = document.querySelectorAll('.btn-listen');
+  btns.forEach(b => b.textContent = '🔊 Ouvir');
 
-  const chunks = splitTextIntoChunks(cleanText);
-  const voice = findFeminineVoice();
+  try {
+    const res = await fetch(`${API_BASE}/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
 
-  console.log('[TTS] Speaking', chunks.length, 'chunks. Voice:', voice ? voice.name : 'default');
-
-  function speakChunk(index) {
-    if (index >= chunks.length) {
-      stopKeepAlive();
+    if (!res.ok) {
+      console.log('[TTS] Server error:', res.status);
       return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(chunks[index]);
-    utterance.lang = 'pt-BR';
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
+    const audioBlob = await res.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
 
-    if (voice) {
-      utterance.voice = voice;
-      if (voice.name.includes('Natural')) {
-        utterance.rate = 1.0;
-      }
-    }
+    currentAudio = new Audio(audioUrl);
+    currentAudio.volume = 1.0;
 
-    utterance.onend = () => speakChunk(index + 1);
-    utterance.onerror = (e) => {
-      console.log('[TTS] Error on chunk', index, e.error);
-      stopKeepAlive();
-      // Retry once on error (common on mobile)
-      if (index === 0 && chunks.length > 0) {
-        setTimeout(() => {
-          window.speechSynthesis.cancel();
-          const retry = new SpeechSynthesisUtterance(chunks[0]);
-          retry.lang = 'pt-BR';
-          retry.volume = 1.0;
-          if (voice) retry.voice = voice;
-          retry.onend = () => speakChunk(1);
-          window.speechSynthesis.speak(retry);
-        }, 300);
-      }
+    currentAudio.onended = () => {
+      URL.revokeObjectURL(audioUrl);
+      currentAudio = null;
     };
 
-    window.speechSynthesis.speak(utterance);
+    currentAudio.onerror = () => {
+      console.log('[TTS] Audio playback error');
+      URL.revokeObjectURL(audioUrl);
+      currentAudio = null;
+    };
+
+    await currentAudio.play();
+  } catch (err) {
+    console.log('[TTS] Error:', err);
   }
-
-  startKeepAlive();
-  // Delay after cancel() — critical fix for Android Chrome
-  setTimeout(() => speakChunk(0), 150);
 }
 
-function findFeminineVoice() {
-  if (cachedFeminineVoice) return cachedFeminineVoice;
-
-  const voices = window.speechSynthesis.getVoices();
-  if (!voices.length) return null;
-
-  const ptVoices = voices.filter(v => v.lang.startsWith('pt'));
-
-  // 1. BEST: Microsoft Edge Natural voices
-  const natural = ptVoices.find(v => v.name.includes('Natural') && (v.name.includes('Francisca') || v.name.includes('Maria')));
-  if (natural) { cachedFeminineVoice = natural; return natural; }
-
-  // 2. GOOD: Google/Samsung/Online voices (common on Android)
-  const online = ptVoices.find(v => {
-    const n = v.name.toLowerCase();
-    return n.includes('google') || n.includes('online') || n.includes('samsung');
-  });
-  if (online) { cachedFeminineVoice = online; return online; }
-
-  // 3. System Feminine voices
-  const feminine = ptVoices.find(v => {
-    const n = v.name.toLowerCase();
-    return n.includes('francisca') || n.includes('maria') || n.includes('helena') || n.includes('luciana') || n.includes('female');
-  });
-  if (feminine) { cachedFeminineVoice = feminine; return feminine; }
-
-  // 4. Any pt-BR voice
-  const ptBr = ptVoices.find(v => v.lang === 'pt-BR');
-  if (ptBr) { cachedFeminineVoice = ptBr; return ptBr; }
-
-  return ptVoices[0] || null;
-}
-
-// Preload voices (some mobile browsers load them asynchronously)
-if ('speechSynthesis' in window) {
-  window.speechSynthesis.onvoiceschanged = () => {
-    cachedFeminineVoice = null;
-    findFeminineVoice();
-  };
-  // Trigger initial load
-  window.speechSynthesis.getVoices();
-  // Some Android browsers need a delay to load voices
-  setTimeout(() => window.speechSynthesis.getVoices(), 500);
+// Stop audio when starting new chat
+function stopAudio() {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
 }
 
 // ── Speech Recognition ─────────────────────────────────────────
