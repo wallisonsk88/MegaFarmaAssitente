@@ -6,15 +6,15 @@
 
 /* ── CSS Variables ─────────────────────────────────────────── */
 :root {
-  --bg-primary: #7f1d1d;
-  /* Deep Red */
-  --bg-secondary: #991b1b;
-  /* Medium Red */
-  --bg-card: #b91c1c;
-  /* Lighter Red */
-  --bg-input: #fef2f2;
+  --bg-primary: #dc2626;
+  /* Bright Red */
+  --bg-secondary: #ef4444;
+  /* Light Red */
+  --bg-card: #f87171;
+  /* Soft Red */
+  --bg-input: #fff5f5;
   /* Very Light Red/White for inputs */
-  --surface-hover: #dc2626;
+  --surface-hover: #f87171;
   --accent: #ffffff;
   /* White buttons/accents */
   --accent-glow: rgba(255, 255, 255, 0.3);
@@ -22,15 +22,15 @@
 
   --text-primary: #ffffff;
   --text-secondary: #fee2e2;
-  --text-muted: #fca5a5;
-  --border: rgba(255, 255, 255, 0.2);
+  --text-muted: #fecaca;
+  --border: rgba(255, 255, 255, 0.25);
   --user-bubble: linear-gradient(135deg, #ffffff, #f3f4f6);
-  --user-text: #b91c1c;
-  --bot-bubble: #991b1b;
-  --danger: #ef4444;
+  --user-text: #dc2626;
+  --bot-bubble: #ef4444;
+  --danger: #b91c1c;
   --radius: 16px;
   --radius-sm: 10px;
-  --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

@@ -304,7 +304,10 @@ function startListening() {
     }
     return;
   }
-  showChat();
+  // Hide keyboard by removing focus from input
+  messageInput.blur();
+  document.activeElement?.blur();
+
   isListening = true;
   avatarContainer.classList.add('listening');
   btnMic.classList.add('active');
