@@ -83,7 +83,9 @@ function addMessage(role, text, imageData = null) {
   const div = document.createElement('div');
   div.className = `message ${role}`;
 
-  const avatar = role === 'bot' ? '🤖' : '👤';
+  const avatarHtml = role === 'bot'
+    ? '<img src="avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">'
+    : '👤';
 
   let contentHTML = '';
   if (imageData) {
@@ -96,7 +98,7 @@ function addMessage(role, text, imageData = null) {
   contentHTML += formattedText;
 
   div.innerHTML = `
-    <div class="message-avatar">${avatar}</div>
+    <div class="message-avatar">${avatarHtml}</div>
     <div>
       <div class="bubble">${contentHTML}</div>
       <div class="message-time">${getTime()}</div>
@@ -113,7 +115,9 @@ function showTyping() {
   div.className = 'message bot';
   div.id = 'typingMsg';
   div.innerHTML = `
-    <div class="message-avatar">🤖</div>
+    <div class="message-avatar">
+      <img src="avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
+    </div>
     <div>
       <div class="bubble">
         <div class="typing-indicator">
@@ -199,62 +203,81 @@ async function sendMessage() {
 // ── TTS ────────────────────────────────────────────────────────
 let cachedFeminineVoice = null;
 
+function speakText(text) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+
+  // Dictonary to fix common mispronunciations or robotic sounds
+  const phoneticMap = {
+    'MIPs': 'remédios isentos de receita',
+    'MIP': 'remédio isento de receita',
+    'MegaFarma': 'Mega Farma',
+    'AI': 'inteligência artificial',
+    'bot': 'assistente',
+    'mg': 'miligramas',
+    'mcg': 'microgramas',
+    'ml': 'mililitros',
+  };
+
+  let cleanText = text
+    .replace(/[*_~`#>]/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\n{2,}/g, '. ')
+    .trim();
+
+  // Apply phonetic fixes
+  Object.keys(phoneticMap).forEach(key => {
+    const reg = new RegExp(`\\b${key}\\b`, 'gi');
+    cleanText = cleanText.replace(reg, phoneticMap[key]);
+  });
+
+  if (!cleanText) return;
+
+  const utterance = new SpeechSynthesisUtterance(cleanText);
+  utterance.lang = 'pt-BR';
+
+  // Natural settings
+  utterance.rate = 1.0;
+  utterance.pitch = 1.0;
+  utterance.volume = 1.0;
+
+  const voice = findFeminineVoice();
+  if (voice) {
+    utterance.voice = voice;
+    // Microsoft Edge "Natural" voices are the best. 
+    // They are often much slower and higher quality, so we don't need rate adjustment.
+    if (voice.name.includes('Natural')) {
+      utterance.rate = 1.0;
+    }
+  }
+
+  window.speechSynthesis.speak(utterance);
+}
+
 function findFeminineVoice() {
   if (cachedFeminineVoice) return cachedFeminineVoice;
 
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
 
-  // Priority list of known feminine pt-BR voices (Windows, Chrome, Edge, Android)
-  const feminineKeywords = [
-    'francisca', 'fernanda', 'heloisa', 'maria', 'raquel',
-    'vitoria', 'camila', 'luciana', 'leticia', 'brenda',
-    'female', 'feminino', 'woman'
-  ];
+  const ptBrVoices = voices.filter(v => v.lang.startsWith('pt'));
 
-  // 1st: Try to find a known feminine pt-BR voice
-  const ptBrVoices = voices.filter(v => v.lang === 'pt-BR');
-  for (const keyword of feminineKeywords) {
-    const match = ptBrVoices.find(v => v.name.toLowerCase().includes(keyword));
-    if (match) { cachedFeminineVoice = match; return match; }
-  }
+  // 1. BEST: Microsoft Edge Natural voices (State of the art free voices)
+  const natural = ptBrVoices.find(v => v.name.includes('Natural') && (v.name.includes('Francisca') || v.name.includes('Maria')));
+  if (natural) { cachedFeminineVoice = natural; return natural; }
 
-  // 2nd: Any pt-BR voice (usually the default is feminine on most systems)
-  if (ptBrVoices.length) { cachedFeminineVoice = ptBrVoices[0]; return ptBrVoices[0]; }
+  // 2. GOOD: Google/Online High Quality voices
+  const google = ptBrVoices.find(v => v.name.includes('Google') || v.name.includes('Online'));
+  if (google) { cachedFeminineVoice = google; return google; }
 
-  // 3rd: Any Portuguese voice
-  const ptVoice = voices.find(v => v.lang.startsWith('pt'));
-  if (ptVoice) { cachedFeminineVoice = ptVoice; return ptVoice; }
+  // 3. System Feminine
+  const feminine = ptBrVoices.find(v => {
+    const n = v.name.toLowerCase();
+    return n.includes('francisca') || n.includes('maria') || n.includes('helena') || n.includes('luciana');
+  });
+  if (feminine) { cachedFeminineVoice = feminine; return feminine; }
 
-  return null;
-}
-
-function speakText(text) {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-
-  // Clean markdown/emojis for cleaner speech
-  const cleanText = text
-    .replace(/[*_~`#>]/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/\n{2,}/g, '. ')
-    .trim();
-
-  if (!cleanText) return;
-
-  const utterance = new SpeechSynthesisUtterance(cleanText);
-  utterance.lang = 'pt-BR';
-  utterance.rate = 1.0;    // Velocidade natural e clara
-  utterance.pitch = 1.15;  // Tom levemente mais agudo = mais feminino e simpático
-  utterance.volume = 1.0;
-
-  const voice = findFeminineVoice();
-  if (voice) {
-    utterance.voice = voice;
-    console.log(`[TTS] Usando voz: ${voice.name} (${voice.lang})`);
-  }
-
-  window.speechSynthesis.speak(utterance);
+  return ptBrVoices[0] || null;
 }
 
 // Preload voices

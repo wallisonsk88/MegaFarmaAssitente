@@ -19,8 +19,7 @@
   /* White buttons/accents */
   --accent-glow: rgba(255, 255, 255, 0.3);
   --accent-secondary: #f3f4f6;
-  --green: #10b981;
-  --green-glow: rgba(16, 185, 129, 0.2);
+
   --text-primary: #ffffff;
   --text-secondary: #fee2e2;
   --text-muted: #fca5a5;
@@ -196,8 +195,7 @@ body {
 }
 
 .avatar-face {
-  font-size: 64px;
-  animation: float 3s ease-in-out infinite;
+  display: none;
 }
 
 @keyframes float {
@@ -371,11 +369,15 @@ body {
 }
 
 .message.bot .message-avatar {
-  background: linear-gradient(135deg, var(--accent), var(--green));
+  background: white;
+  color: #b91c1c;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .message.user .message-avatar {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .bubble {
@@ -718,7 +720,7 @@ body {
   justify-content: center;
   gap: 10px;
   padding: 10px 16px;
-  background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(16, 185, 129, 0.1));
+  background: linear-gradient(135deg, rgba(185, 28, 28, 0.15), rgba(220, 38, 38, 0.1));
   border-top: 1px solid var(--border);
   cursor: pointer;
   transition: var(--transition);
@@ -729,7 +731,7 @@ body {
 }
 
 .coupon-bar:hover {
-  background: linear-gradient(135deg, rgba(34, 211, 238, 0.15), rgba(16, 185, 129, 0.15));
+  background: linear-gradient(135deg, rgba(185, 28, 28, 0.25), rgba(220, 38, 38, 0.15));
 }
 
 .coupon-bar span {
