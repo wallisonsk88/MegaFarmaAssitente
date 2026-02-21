@@ -52,8 +52,10 @@ def _build_messages(
     image_b64: Optional[str] = None,
 ) -> list[dict]:
     """Build the messages array with system prompt, history, and current message."""
-    from datetime import datetime
-    now = datetime.now()
+    from datetime import datetime, timezone, timedelta
+    # Brasília timezone (UTC-3)
+    tz_brasilia = timezone(timedelta(hours=-3))
+    now = datetime.now(tz_brasilia)
     hora = now.strftime("%H:%M")
     
     # Add current time context to system prompt
