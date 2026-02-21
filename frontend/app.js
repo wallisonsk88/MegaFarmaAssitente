@@ -200,58 +200,147 @@ async function sendMessage() {
   }
 }
 
-// ── TTS ────────────────────────────────────────────────────────
+// ── TTS (Mobile-Compatible) ────────────────────────────────────
 let cachedFeminineVoice = null;
+let ttsUnlocked = false;
+let ttsKeepAliveTimer = null;
 
-function speakText(text) {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
+// Warm-up: unlock TTS on first user interaction (required for mobile)
+function unlockTTS() {
+  if (ttsUnlocked || !('speechSynthesis' in window)) return;
+  const silentUtterance = new SpeechSynthesisUtterance('');
+  silentUtterance.volume = 0;
+  silentUtterance.lang = 'pt-BR';
+  window.speechSynthesis.speak(silentUtterance);
+  ttsUnlocked = true;
+}
 
-  // Dictonary to fix common mispronunciations or robotic sounds
-  const phoneticMap = {
-    'MIPs': 'remédios isentos de receita',
-    'MIP': 'remédio isento de receita',
-    'MegaFarma': 'Mega Farma',
-    'AI': 'inteligência artificial',
-    'bot': 'assistente',
-    'mg': 'miligramas',
-    'mcg': 'microgramas',
-    'ml': 'mililitros',
-  };
+// Unlock on any user interaction
+['click', 'touchstart', 'keydown'].forEach(evt => {
+  document.addEventListener(evt, unlockTTS, { once: true });
+});
 
-  let cleanText = text
+// Dictionary to fix common mispronunciations
+const phoneticMap = {
+  'MIPs': 'remédios isentos de receita',
+  'MIP': 'remédio isento de receita',
+  'MegaFarma': 'Mega Farma',
+  'AI': 'inteligência artificial',
+  'bot': 'assistente',
+  'mg': 'miligramas',
+  'mcg': 'microgramas',
+  'ml': 'mililitros',
+};
+
+function cleanTextForTTS(text) {
+  let clean = text
     .replace(/[*_~`#>]/g, '')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/\n{2,}/g, '. ')
+    .replace(/\n/g, ', ')
     .trim();
 
   // Apply phonetic fixes
   Object.keys(phoneticMap).forEach(key => {
     const reg = new RegExp(`\\b${key}\\b`, 'gi');
-    cleanText = cleanText.replace(reg, phoneticMap[key]);
+    clean = clean.replace(reg, phoneticMap[key]);
   });
 
-  if (!cleanText) return;
+  return clean;
+}
 
-  const utterance = new SpeechSynthesisUtterance(cleanText);
-  utterance.lang = 'pt-BR';
+// Split long text into chunks to avoid Chrome Mobile bug that stops speaking
+function splitTextIntoChunks(text, maxLength = 200) {
+  if (text.length <= maxLength) return [text];
 
-  // Natural settings
-  utterance.rate = 1.0;
-  utterance.pitch = 1.0;
-  utterance.volume = 1.0;
+  const chunks = [];
+  // Split by sentences first
+  const sentences = text.split(/(?<=[.!?;])\s+/);
+  let current = '';
 
-  const voice = findFeminineVoice();
-  if (voice) {
-    utterance.voice = voice;
-    // Microsoft Edge "Natural" voices are the best. 
-    // They are often much slower and higher quality, so we don't need rate adjustment.
-    if (voice.name.includes('Natural')) {
-      utterance.rate = 1.0;
+  for (const sentence of sentences) {
+    if ((current + ' ' + sentence).trim().length > maxLength && current) {
+      chunks.push(current.trim());
+      current = sentence;
+    } else {
+      current = current ? current + ' ' + sentence : sentence;
     }
   }
+  if (current.trim()) chunks.push(current.trim());
 
-  window.speechSynthesis.speak(utterance);
+  return chunks;
+}
+
+// Chrome Mobile bug: speechSynthesis pauses after ~15s. This keeps it alive.
+function startKeepAlive() {
+  stopKeepAlive();
+  ttsKeepAliveTimer = setInterval(() => {
+    if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    }
+  }, 10000); // Every 10 seconds
+}
+
+function stopKeepAlive() {
+  if (ttsKeepAliveTimer) {
+    clearInterval(ttsKeepAliveTimer);
+    ttsKeepAliveTimer = null;
+  }
+}
+
+function speakText(text) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  stopKeepAlive();
+
+  const cleanText = cleanTextForTTS(text);
+  if (!cleanText) return;
+
+  const chunks = splitTextIntoChunks(cleanText);
+  const voice = findFeminineVoice();
+
+  function speakChunk(index) {
+    if (index >= chunks.length) {
+      stopKeepAlive();
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(chunks[index]);
+    utterance.lang = 'pt-BR';
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    if (voice) {
+      utterance.voice = voice;
+      if (voice.name.includes('Natural')) {
+        utterance.rate = 1.0;
+      }
+    }
+
+    utterance.onend = () => speakChunk(index + 1);
+    utterance.onerror = () => {
+      stopKeepAlive();
+      // Retry once on error (common on mobile)
+      if (index === 0 && chunks.length > 0) {
+        setTimeout(() => {
+          window.speechSynthesis.cancel();
+          const retry = new SpeechSynthesisUtterance(chunks[0]);
+          retry.lang = 'pt-BR';
+          retry.volume = 1.0;
+          if (voice) retry.voice = voice;
+          retry.onend = () => speakChunk(1);
+          window.speechSynthesis.speak(retry);
+        }, 300);
+      }
+    };
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  startKeepAlive();
+  speakChunk(0);
 }
 
 function findFeminineVoice() {
@@ -260,27 +349,34 @@ function findFeminineVoice() {
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
 
-  const ptBrVoices = voices.filter(v => v.lang.startsWith('pt'));
+  const ptVoices = voices.filter(v => v.lang.startsWith('pt'));
 
-  // 1. BEST: Microsoft Edge Natural voices (State of the art free voices)
-  const natural = ptBrVoices.find(v => v.name.includes('Natural') && (v.name.includes('Francisca') || v.name.includes('Maria')));
+  // 1. BEST: Microsoft Edge Natural voices
+  const natural = ptVoices.find(v => v.name.includes('Natural') && (v.name.includes('Francisca') || v.name.includes('Maria')));
   if (natural) { cachedFeminineVoice = natural; return natural; }
 
-  // 2. GOOD: Google/Online High Quality voices
-  const google = ptBrVoices.find(v => v.name.includes('Google') || v.name.includes('Online'));
-  if (google) { cachedFeminineVoice = google; return google; }
-
-  // 3. System Feminine
-  const feminine = ptBrVoices.find(v => {
+  // 2. GOOD: Google/Samsung/Online voices (common on Android)
+  const online = ptVoices.find(v => {
     const n = v.name.toLowerCase();
-    return n.includes('francisca') || n.includes('maria') || n.includes('helena') || n.includes('luciana');
+    return n.includes('google') || n.includes('online') || n.includes('samsung');
+  });
+  if (online) { cachedFeminineVoice = online; return online; }
+
+  // 3. System Feminine voices
+  const feminine = ptVoices.find(v => {
+    const n = v.name.toLowerCase();
+    return n.includes('francisca') || n.includes('maria') || n.includes('helena') || n.includes('luciana') || n.includes('female');
   });
   if (feminine) { cachedFeminineVoice = feminine; return feminine; }
 
-  return ptBrVoices[0] || null;
+  // 4. Any pt-BR voice
+  const ptBr = ptVoices.find(v => v.lang === 'pt-BR');
+  if (ptBr) { cachedFeminineVoice = ptBr; return ptBr; }
+
+  return ptVoices[0] || null;
 }
 
-// Preload voices
+// Preload voices (some mobile browsers load them asynchronously)
 if ('speechSynthesis' in window) {
   window.speechSynthesis.onvoiceschanged = () => {
     cachedFeminineVoice = null;
@@ -288,6 +384,8 @@ if ('speechSynthesis' in window) {
   };
   // Trigger initial load
   window.speechSynthesis.getVoices();
+  // Some Android browsers need a delay to load voices
+  setTimeout(() => window.speechSynthesis.getVoices(), 500);
 }
 
 // ── Speech Recognition ─────────────────────────────────────────
@@ -539,7 +637,73 @@ $('#btnSaveCoupon').addEventListener('click', generateCoupon);
 configModal.addEventListener('click', (e) => { if (e.target === configModal) configModal.classList.remove('active'); });
 couponModal.addEventListener('click', (e) => { if (e.target === couponModal) couponModal.classList.remove('active'); });
 
-// ── PWA / Service Worker ───────────────────────────────────────
+// ── PWA / Service Worker + Install Prompt ──────────────────
+let deferredInstallPrompt = null;
+const installBanner = document.getElementById('installBanner');
+const btnInstallPWA = document.getElementById('btnInstallPWA');
+const btnDismissInstall = document.getElementById('btnDismissInstall');
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => { });
+}
+
+// Capture the install prompt event
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+
+  // Check if user dismissed before
+  const dismissed = localStorage.getItem('pwa-install-dismissed');
+  if (dismissed) {
+    const dismissedTime = parseInt(dismissed, 10);
+    // Show again after 7 days
+    if (Date.now() - dismissedTime < 7 * 24 * 60 * 60 * 1000) return;
+  }
+
+  // Show install banner after 3 seconds
+  setTimeout(() => {
+    if (installBanner) installBanner.classList.add('visible');
+  }, 3000);
+});
+
+// Install button click
+if (btnInstallPWA) {
+  btnInstallPWA.addEventListener('click', async () => {
+    if (!deferredInstallPrompt) {
+      // If no deferred prompt, show manual instructions
+      showToast('Abra no Microsoft Edge e clique em ⋯ → "Instalar site como app"');
+      installBanner.classList.remove('visible');
+      return;
+    }
+
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+
+    if (outcome === 'accepted') {
+      showToast('✅ App instalado com sucesso!');
+    }
+
+    deferredInstallPrompt = null;
+    installBanner.classList.remove('visible');
+  });
+}
+
+// Dismiss button click
+if (btnDismissInstall) {
+  btnDismissInstall.addEventListener('click', () => {
+    installBanner.classList.remove('visible');
+    localStorage.setItem('pwa-install-dismissed', Date.now().toString());
+  });
+}
+
+// Detect when app is installed
+window.addEventListener('appinstalled', () => {
+  showToast('✅ MegaFarma instalado no seu dispositivo!');
+  installBanner.classList.remove('visible');
+  deferredInstallPrompt = null;
+});
+
+// If already installed (standalone mode), hide banner
+if (window.matchMedia('(display-mode: standalone)').matches) {
+  if (installBanner) installBanner.style.display = 'none';
 }
