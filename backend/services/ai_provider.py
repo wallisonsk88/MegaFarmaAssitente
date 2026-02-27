@@ -72,18 +72,21 @@ def search_store_products(query: str) -> str:
         print(f"[DEBUG] Procurando produtos no site para: {search_term}")
         
         query_encoded = urllib.parse.quote(search_term)
-        url = f"https://meucomercio.com.br/megafarmacodo?search={query_encoded}"
-        response = requests.get(url, timeout=10)
+        # Usar a API direta do MyCommerce
+        url = f"https://meucomercio.com.br/api/product/shop/1673173/products?page=1&perPage=20&search={query_encoded}"
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Host": "meucomercio.com.br"
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
         if response.status_code != 200:
+            print(f"[ERROR] API de busca retornou status {response.status_code}")
             return ""
             
-        html = response.text
-        m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html)
-        if not m:
-            return ""
-            
-        data = json.loads(m.group(1))
-        products = data.get("props", {}).get("pageProps", {}).get("products", [])
+        data = response.json()
+        products = data.get("products", [])
         
         if not products:
             return "Nenhum produto encontrado no estoque para esta busca."
