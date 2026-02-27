@@ -22,9 +22,9 @@ SYSTEM_PROMPT = (
     "- Ao final da conversa, SOMENTE se o cliente se despedir, diga: 'A MegaFarma agradece! Estou à disposição.'\n"
     "- Responda sempre em português do Brasil impecável.\n\n"
     "REGRAS DE ATENDIMENTO E PREÇOS:\n"
-    "- Baseie-se APENAS nos [RESULTADOS DA BUSCA NO ESTOQUE] injetados no final deste prompt para informar preços reais.\n"
-    "- NUNCA invente preços ou suponha valores. Se o produto não estiver nos resultados da busca, informe que não o encontrou no sistema no momento.\n"
-    "- Foque em indicar Medicamentos Isentos de Prescrição (MIPs) para os sintomas relatados.\n"
+    "- Foque APENAS na orientação sobre a função dos medicamentos e escolha dos MIPs ideais para os sintomas relatados.\n"
+    "- NUNCA informe preços, valores ou disponibilidade de estoque, pois você não tem acesso ao sistema de vendas no momento.\n"
+    "- Se o cliente perguntar o preço ou se tem o produto, responda: 'Para consultar preços e estoques atualizados, por favor verifique com um de nossos atendentes no balcão ou no zap!'\n"
     "- NUNCA preencha a tela do usuário com textões ou listas longas. Indique no máximo 2 produtos de forma muito natural, como no balcão.\n"
     "- SÓ oriente procurar um médico em casos de extrema urgência/gravidade evidente.\n"
     "- Contatos MegaFarma: Av Cristovão Colombo, 1174, Bairro Trizidela | WhatsApp/Telefone: (99) 9 8274-6469."
@@ -50,64 +50,6 @@ def _build_headers(provider: str, api_key: str) -> dict:
     return headers
 
 
-def search_store_products(query: str) -> str:
-    """Busca produtos no site da MegaFarma simulando uma consulta ao estoque."""
-    import re
-    import json
-    import urllib.parse
-    import requests
-    
-    try:
-        msg_lower = query.lower()
-        if not re.search(r'\b(preço|preco|valor|custa|tem|têm)\b', msg_lower):
-            return ""
-            
-        stopwords = ["qual", "o", "a", "do", "da", "de", "preço", "preco", "valor", "custa", "tem", "vocês", "voces", "gostaria", "saber", "quanto", "é", "por", "favor", "me", "informe", "você", "voce", "queria", "saber"]
-        words = re.findall(r'\w+', msg_lower)
-        query_words = [w for w in words if w not in stopwords and len(w) > 2]
-        if not query_words:
-            return ""
-            
-        search_term = " ".join(query_words)
-        print(f"[DEBUG] Procurando produtos no site para: {search_term}")
-        
-        query_encoded = urllib.parse.quote(search_term)
-        # Usar a API direta do MyCommerce
-        url = f"https://meucomercio.com.br/api/product/shop/1673173/products?page=1&perPage=20&search={query_encoded}"
-        headers = {
-            "Accept": "application/json, text/plain, */*",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Referer": "https://meucomercio.com.br/megafarmacodo"
-        }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code != 200:
-            print(f"[ERROR] API de busca retornou status {response.status_code}")
-            return ""
-            
-        data = response.json()
-        products = data.get("products", [])
-        
-        if not products:
-            return "Nenhum produto encontrado no estoque para esta busca."
-            
-        results = []
-        for p in products[:5]:
-            name = p.get("ProductName", "Produto sem nome")
-            price = p.get("SalePrice", 0)
-            promo_price = p.get("PromoSalePrice", 0)
-            final_price = promo_price if promo_price > 0 else price
-            
-            if final_price:
-                price_str = f"R$ {final_price:.2f}".replace(".", ",")
-                results.append(f"- {name}: {price_str}")
-            
-        return "\n".join(results)
-    except Exception as e:
-        print(f"[ERROR] Falha ao buscar produtos no site: {e}")
-        return ""
-
-
 def _build_messages(
     history: list[dict],
     message: str,
@@ -120,14 +62,8 @@ def _build_messages(
     now = datetime.now(tz_brasilia)
     hora = now.strftime("%H:%M")
     
-    search_results = ""
-    if message:
-        results = search_store_products(message)
-        if results:
-            search_results = f"\n\n[RESULTADOS DA BUSCA NO ESTOQUE POR: {message}]\n{results}\n(Aja como humano, diga 'encontrei esses produtos...' e informe os valores naturalmente. Não revele os detalhes de busca técnica.)"
-
-    # Add current time context and search context to system prompt
-    system_with_time = f"{SYSTEM_PROMPT}\n\nHORÁRIO ATUAL: {hora} (use para saudações adequadas).{search_results}"
+    # Add current time context to system prompt
+    system_with_time = f"{SYSTEM_PROMPT}\n\nHORÁRIO ATUAL: {hora} (use para saudações adequadas)."
     
     messages = [{"role": "system", "content": system_with_time}]
 

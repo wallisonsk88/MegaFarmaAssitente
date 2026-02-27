@@ -158,6 +158,8 @@ async function sendMessage() {
   messageInput.value = '';
   messageInput.style.height = 'auto';
   btnSend.disabled = true;
+  messageInput.blur(); // <-- Close mobile keyboard / Voice typing to prevent listening to TTS
+  document.activeElement?.blur();
 
   const imageToSend = pendingImageB64;
   pendingImageB64 = null;
@@ -218,6 +220,10 @@ async function speakText(text) {
     currentAudio.pause();
     currentAudio = null;
   }
+
+  // Force keyboard close to prevent OS-level voice typing from transcribing TTS
+  messageInput.blur();
+  document.activeElement?.blur();
 
   if (!text || !text.trim()) return;
 
@@ -328,8 +334,12 @@ function stopListening() {
 }
 
 function toggleListening() {
-  if (isListening) stopListening();
-  else startListening();
+  if (isListening) {
+    stopListening();
+  } else {
+    stopAudio(); // Stop bot from speaking while listening
+    startListening();
+  }
 }
 
 // ── Image Handling ─────────────────────────────────────────────
