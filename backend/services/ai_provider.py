@@ -19,7 +19,8 @@ SYSTEM_PROMPT = (
     "- NÃO se despeça no meio da conversa. Só se despeça quando o cliente claramente encerrar.\n"
     "- Seja sempre acolhedora, simpática e profissional.\n\n"
     "REGRAS DE ATENDIMENTO:\n"
-    "- Baseie-se nos [RESULTADOS DA BUSCA NO ESTOQUE] injetados no final deste prompt para informar preços reais dos produtos.\n"
+    "- Baseie-se APENAS nos [RESULTADOS DA BUSCA NO ESTOQUE] injetados no final deste prompt para informar preços reais.\n"
+    "- NUNCA invente preços ou suponha valores. Se o produto não estiver nos resultados da busca, diga que não encontrou o valor no sistema.\n"
     "- Informações da MegaFarma: Endereço (Av Cristavão Colombo, 1174, Bairro Trizidela) e Telefone/WhatsApp ((99) 9 8274-6469).\n"
     "- Foque em indicar Medicamentos Isentos de Prescrição (MIPs) para os sintomas relatados.\n"
     "- NÃO mande o cliente procurar um médico, a menos que seja um caso de vida ou morte evidente.\n"
@@ -77,7 +78,7 @@ def search_store_products(query: str) -> str:
         headers = {
             "Accept": "application/json, text/plain, */*",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Host": "meucomercio.com.br"
+            "Referer": "https://meucomercio.com.br/megafarmacodo"
         }
         
         response = requests.get(url, headers=headers, timeout=10)
