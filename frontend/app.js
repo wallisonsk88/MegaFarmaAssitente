@@ -29,6 +29,7 @@ const toast = $('#toast');
 let conversationHistory = [];
 let pendingImageB64 = null;
 let isListening = false;
+let isBotSpeaking = false;
 let recognition = null;
 let messageCount = 0;
 
@@ -252,17 +253,21 @@ async function speakText(text) {
     currentAudio.onended = () => {
       URL.revokeObjectURL(audioUrl);
       currentAudio = null;
+      isBotSpeaking = false;
     };
 
     currentAudio.onerror = () => {
       console.log('[TTS] Audio playback error');
       URL.revokeObjectURL(audioUrl);
       currentAudio = null;
+      isBotSpeaking = false;
     };
 
+    isBotSpeaking = true;
     await currentAudio.play();
   } catch (err) {
     console.log('[TTS] Error:', err);
+    isBotSpeaking = false;
   }
 }
 
@@ -272,6 +277,7 @@ function stopAudio() {
     currentAudio.pause();
     currentAudio = null;
   }
+  isBotSpeaking = false;
 }
 
 // ── Speech Recognition ─────────────────────────────────────────
@@ -285,7 +291,7 @@ function setupSpeechRecognition() {
   rec.interimResults = false;
 
   rec.onresult = (e) => {
-    if (!isListening) return; // Ignore ghost transcriptions after mic is closed
+    if (!isListening || isBotSpeaking) return; // Ignore ghost transcriptions and prevent listening while bot talks
 
     // Always get the most recent transcription
     const lastResultIndex = e.results.length - 1;
