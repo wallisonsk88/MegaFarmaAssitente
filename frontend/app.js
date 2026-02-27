@@ -150,6 +150,8 @@ async function sendMessage() {
   const text = messageInput.value.trim();
   if (!text && !pendingImageB64) return;
 
+  if (isListening) stopListening();
+
   showChat();
 
   // Add user message to chat
@@ -287,21 +289,37 @@ function setupSpeechRecognition() {
 
   const rec = new SpeechRecognition();
   rec.lang = 'pt-BR';
-  rec.continuous = false;
-  rec.interimResults = false;
+  rec.continuous = true; // Keep listening during short pauses
+  rec.interimResults = true; // Show results as user speaks
+
+  let speechTimeout = null;
 
   rec.onresult = (e) => {
     if (!isListening || isBotSpeaking) return; // Ignore ghost transcriptions and prevent listening while bot talks
 
-    // Always get the most recent transcription
-    const lastResultIndex = e.results.length - 1;
-    const transcript = e.results[lastResultIndex][0].transcript;
+    let fullTranscript = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      fullTranscript += e.results[i][0].transcript;
+    }
 
-    messageInput.value = transcript;
+    // Append or replace? It's better to just build the full transcript from all results
+    let completeTranscript = '';
+    for (let i = 0; i < e.results.length; i++) {
+      completeTranscript += e.results[i][0].transcript;
+    }
+
+    messageInput.value = completeTranscript;
+    autoResize();
     updateSendBtn();
-    stopListening();
-    // Auto-send after voice
-    setTimeout(() => sendMessage(), 300);
+
+    // Reset the auto-send timer whenever the user says a new word
+    clearTimeout(speechTimeout);
+    speechTimeout = setTimeout(() => {
+      if (isListening && messageInput.value.trim().length > 0) {
+        stopListening();
+        sendMessage();
+      }
+    }, 2500); // Wait 2.5s of silence before auto-sending
   };
 
   rec.onerror = () => stopListening();
