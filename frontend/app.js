@@ -511,7 +511,15 @@ fileInput.addEventListener('change', (e) => {
 });
 
 // Config modal
-btnConfig.addEventListener('click', () => { loadConfig(); configModal.classList.add('active'); });
+btnConfig.addEventListener('click', () => {
+  const pwd = prompt('Acesso restrito. Digite a senha:');
+  if (pwd === 'mega2024') {
+    loadConfig();
+    configModal.classList.add('active');
+  } else if (pwd !== null) {
+    showToast('Senha incorreta!');
+  }
+});
 $('#cfgProvider').addEventListener('change', handleProviderChange);
 $('#btnCancelConfig').addEventListener('click', () => configModal.classList.remove('active'));
 $('#btnSaveConfig').addEventListener('click', saveConfig);
