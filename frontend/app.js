@@ -285,7 +285,12 @@ function setupSpeechRecognition() {
   rec.interimResults = false;
 
   rec.onresult = (e) => {
-    const transcript = e.results[0][0].transcript;
+    if (!isListening) return; // Ignore ghost transcriptions after mic is closed
+
+    // Always get the most recent transcription
+    const lastResultIndex = e.results.length - 1;
+    const transcript = e.results[lastResultIndex][0].transcript;
+
     messageInput.value = transcript;
     updateSendBtn();
     stopListening();
@@ -329,6 +334,7 @@ function stopListening() {
   avatarContainer.classList.remove('listening');
   btnMic.classList.remove('active');
   if (recognition) {
+    try { recognition.abort(); } catch (e) { } // Force abort to cancel any pending ghost speech processing
     try { recognition.stop(); } catch (e) { }
   }
 }
