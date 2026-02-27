@@ -19,6 +19,7 @@ SYSTEM_PROMPT = (
     "- NÃO se despeça no meio da conversa. Só se despeça quando o cliente claramente encerrar.\n"
     "- Seja sempre acolhedora, simpática e profissional.\n\n"
     "REGRAS DE ATENDIMENTO:\n"
+    "- Baseie-se nos [RESULTADOS DA BUSCA NO ESTOQUE] injetados no final deste prompt para informar preços reais dos produtos.\n"
     "- Informações da MegaFarma: Endereço (Av Cristavão Colombo, 1174, Bairro Trizidela) e Telefone/WhatsApp ((99) 9 8274-6469).\n"
     "- Foque em indicar Medicamentos Isentos de Prescrição (MIPs) para os sintomas relatados.\n"
     "- NÃO mande o cliente procurar um médico, a menos que seja um caso de vida ou morte evidente.\n"
@@ -49,6 +50,61 @@ def _build_headers(provider: str, api_key: str) -> dict:
     return headers
 
 
+def search_store_products(query: str) -> str:
+    """Busca produtos no site da MegaFarma simulando uma consulta ao estoque."""
+    import re
+    import json
+    import urllib.parse
+    import requests
+    
+    try:
+        msg_lower = query.lower()
+        if not re.search(r'\b(preço|preco|valor|custa|tem|têm)\b', msg_lower):
+            return ""
+            
+        stopwords = ["qual", "o", "a", "do", "da", "de", "preço", "preco", "valor", "custa", "tem", "vocês", "voces", "gostaria", "saber", "quanto", "é", "por", "favor", "me", "informe", "você", "voce", "queria", "saber"]
+        words = re.findall(r'\w+', msg_lower)
+        query_words = [w for w in words if w not in stopwords and len(w) > 2]
+        if not query_words:
+            return ""
+            
+        search_term = " ".join(query_words)
+        print(f"[DEBUG] Procurando produtos no site para: {search_term}")
+        
+        query_encoded = urllib.parse.quote(search_term)
+        url = f"https://meucomercio.com.br/megafarmacodo?search={query_encoded}"
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            return ""
+            
+        html = response.text
+        m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html)
+        if not m:
+            return ""
+            
+        data = json.loads(m.group(1))
+        products = data.get("props", {}).get("pageProps", {}).get("products", [])
+        
+        if not products:
+            return "Nenhum produto encontrado no estoque para esta busca."
+            
+        results = []
+        for p in products[:5]:
+            name = p.get("ProductName", "Produto sem nome")
+            price = p.get("SalePrice", 0)
+            promo_price = p.get("PromoSalePrice", 0)
+            final_price = promo_price if promo_price > 0 else price
+            
+            if final_price:
+                price_str = f"R$ {final_price:.2f}".replace(".", ",")
+                results.append(f"- {name}: {price_str}")
+            
+        return "\n".join(results)
+    except Exception as e:
+        print(f"[ERROR] Falha ao buscar produtos no site: {e}")
+        return ""
+
+
 def _build_messages(
     history: list[dict],
     message: str,
@@ -61,8 +117,14 @@ def _build_messages(
     now = datetime.now(tz_brasilia)
     hora = now.strftime("%H:%M")
     
-    # Add current time context to system prompt
-    system_with_time = f"{SYSTEM_PROMPT}\n\nHORÁRIO ATUAL: {hora} (use para saudações adequadas)."
+    search_results = ""
+    if message:
+        results = search_store_products(message)
+        if results:
+            search_results = f"\n\n[RESULTADOS DA BUSCA NO ESTOQUE POR: {message}]\n{results}\n(Aja como humano, diga 'encontrei esses produtos...' e informe os valores naturalmente. Não revele os detalhes de busca técnica.)"
+
+    # Add current time context and search context to system prompt
+    system_with_time = f"{SYSTEM_PROMPT}\n\nHORÁRIO ATUAL: {hora} (use para saudações adequadas).{search_results}"
     
     messages = [{"role": "system", "content": system_with_time}]
 
