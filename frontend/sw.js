@@ -1,6 +1,6 @@
 /* Assistente Digital MegaFarma — Service Worker */
 
-const CACHE_NAME = 'megafarma-v3';
+const CACHE_NAME = 'megafarma-v4';
 const ASSETS = [
     '/',
     '/index.html',
