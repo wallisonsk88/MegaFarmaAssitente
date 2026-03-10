@@ -1,10 +1,12 @@
 {
     "version": 2,
     "public": true,
+    "buildCommand": "echo 'No build required'",
+    "outputDirectory": "frontend",
     "rewrites": [
         {
             "source": "/(.*)",
-            "destination": "/frontend/$1"
+            "destination": "/$1"
         }
     ]
 }
