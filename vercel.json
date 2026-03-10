@@ -1,12 +1,16 @@
 {
     "version": 2,
     "public": true,
-    "buildCommand": "echo 'No build required'",
-    "outputDirectory": "frontend",
-    "rewrites": [
+    "builds": [
         {
-            "source": "/(.*)",
-            "destination": "/$1"
+            "src": "frontend/**",
+            "use": "@vercel/static"
+        }
+    ],
+    "routes": [
+        {
+            "src": "/(.*)",
+            "dest": "/frontend/$1"
         }
     ]
 }
