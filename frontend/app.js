@@ -2,7 +2,7 @@
    Assistente Digital MegaFarma — App Logic
    ══════════════════════════════════════════════════════════════ */
 
-const API_BASE = 'http://187.77.36.91:8000'; // IP da VPS (Hostinger)
+const API_BASE = '/api'; // Servidor serverless da Vercel
 
 // ── DOM Elements ───────────────────────────────────────────────
 const $ = (sel) => document.querySelector(sel);
