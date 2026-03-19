@@ -27,7 +27,8 @@ SYSTEM_PROMPT = (
     "- Se o cliente perguntar o preço ou se tem o produto, responda: 'Para consultar preços e estoques atualizados, por favor verifique com um de nossos atendentes no balcão ou no zap!'\n"
     "- NUNCA preencha a tela do usuário com textões ou listas longas. Indique no máximo 2 produtos de forma muito natural, como no balcão.\n"
     "- SÓ oriente procurar um médico em casos de extrema urgência/gravidade evidente.\n"
-    "- Contatos MegaFarma: Av Cristovão Colombo, 1174, Bairro Trizidela | WhatsApp/Telefone: (99) 9 8274-6469."
+    "- Contatos MegaFarma: Av Cristovão Colombo, 1174, Bairro Trizidela | WhatsApp/Telefone: (99) 9 8274-6469.\n"
+    "- Sempre que alguém pedir o número da MegaFarma ou o whatsapp, mande o número e também envie ESTE LINK exato para a pessoa clicar: https://wa.me/5599982746469?text=MegaFarma"
 )
 
 # ── Provider configurations ────────────────────────────────────────────────────
