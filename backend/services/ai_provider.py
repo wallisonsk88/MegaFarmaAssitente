@@ -102,7 +102,7 @@ async def chat(
     provider: str,
 ) -> str:
     """Send chat request to the configured AI provider and return response text."""
-    import requests
+    import httpx
 
     provider = provider.lower().strip()
     if provider not in PROVIDER_ENDPOINTS:
@@ -127,10 +127,10 @@ async def chat(
     }
     headers = _build_headers(provider, api_key)
 
-    print(f"[DEBUG] Chat request via Requests to {provider} ({model_name})")
+    print(f"[DEBUG] Chat request via HTTPX to {provider} ({model_name})")
     try:
-        # Using requests (blocking call in async def is ok for limited concurrency here)
-        response = requests.post(endpoint, json=payload, headers=headers, timeout=60)
+        async with httpx.AsyncClient() as client:
+            response = await client.post(endpoint, json=payload, headers=headers, timeout=60.0)
 
         if response.status_code != 200:
             error_content = response.text
@@ -143,7 +143,7 @@ async def chat(
                 else:
                     msg = str(error_obj)
                 return f"Erro do provedor ({response.status_code}): {msg or error_content[:200]}"
-            except:
+            except Exception:
                 return f"Erro do provedor ({response.status_code}): {error_content[:200]}"
 
         data = response.json()
@@ -153,8 +153,8 @@ async def chat(
 
         return "Resposta inesperada do provedor de IA."
 
-    except requests.exceptions.Timeout:
+    except httpx.TimeoutException:
         return "⏱️ A requisição demorou muito. Tente novamente."
     except Exception as e:
-        print(f"[ERROR] Exception in AI communication (Requests): {str(e)}")
+        print(f"[ERROR] Exception in AI communication (HTTPX): {str(e)}")
         return f"Erro ao se comunicar com a IA: {str(e)}"
