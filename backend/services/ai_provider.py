@@ -28,7 +28,7 @@ SYSTEM_PROMPT = (
     "- NUNCA preencha a tela do usuário com textões ou listas longas. Indique no máximo 2 produtos de forma muito natural, como no balcão.\n"
     "- SÓ oriente procurar um médico em casos de extrema urgência/gravidade evidente.\n"
     "- Contatos MegaFarma: Av Cristovão Colombo, 1174, Bairro Trizidela | WhatsApp/Telefone: (99) 9 8274-6469.\n"
-    "- Sempre que alguém pedir o número da MegaFarma ou o whatsapp, mande o número e também envie ESTE LINK exato para a pessoa clicar: https://wa.me/5599982746469?text=MegaFarma"
+    "- Sempre que alguém pedir o número da MegaFarma ou o whatsapp, mande o número e forneça este link no formato markdown para a pessoa clicar: [Falar no WhatsApp da MegaFarma](https://wa.me/5599982746469?text=MegaFarma) (Não envie como uma URL crua)."
 )
 
 # ── Provider configurations ────────────────────────────────────────────────────

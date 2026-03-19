@@ -93,15 +93,22 @@ function addMessage(role, text, imageData = null) {
   if (imageData) {
     contentHTML += `<img src="data:image/jpeg;base64,${imageData}" alt="Imagem enviada">`;
   }
+  // Prepare text for TTS (strip URLs so the bot doesn't spell them out)
+  const ttsText = text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Convert [Title](url) to Title
+    .replace(/https?:\/\/[^\s]+/g, '')       // Remove raw http/https URLs
+    .replace(/"/g, '&quot;');
+
   // Process simple markdown-like formatting
   const formattedText = text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" style="color: #25D366; font-weight: bold; text-decoration: underline;">$1 🔗</a>')
     .replace(/\n/g, '<br>');
   contentHTML += formattedText;
 
   // Add listen button for bot messages
   const listenBtnHtml = role === 'bot'
-    ? `<button class="btn-listen" onclick="speakText(this.dataset.text)" data-text="${text.replace(/"/g, '&quot;')}">🔊 Ouvir</button>`
+    ? `<button class="btn-listen" onclick="speakText(this.dataset.text)" data-text="${ttsText}">🔊 Ouvir</button>`
     : '';
 
   div.innerHTML = `
