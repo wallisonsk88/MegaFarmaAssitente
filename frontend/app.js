@@ -181,6 +181,10 @@ async function sendMessage() {
   // Show typing
   showTyping();
 
+  const reqProvider = localStorage.getItem('mega_provider') || 'openrouter';
+  const reqModelName = localStorage.getItem('mega_model_name') || 'meta-llama/llama-4-scout-17b-16e-instruct:free';
+  const reqApiKey = localStorage.getItem('mega_api_key') || '';
+
   try {
     const res = await fetch(`${API_BASE}/chat`, {
       method: 'POST',
@@ -189,6 +193,9 @@ async function sendMessage() {
         message: text || 'Analise esta imagem, por favor.',
         history: conversationHistory.slice(-10), // Last 10 messages
         image: imageToSend,
+        api_key: reqApiKey,
+        model_name: reqModelName,
+        provider: reqProvider
       }),
     });
 
@@ -460,40 +467,45 @@ function handleProviderChange() {
 
 async function loadConfig() {
   try {
-    const res = await fetch(`${API_BASE}/config`);
-    const data = await res.json();
-    const provider = data.MODEL_PROVIDER || 'openrouter';
+    const provider = localStorage.getItem('mega_provider') || 'openrouter';
+    const modelName = localStorage.getItem('mega_model_name') || 'meta-llama/llama-4-scout-17b-16e-instruct:free';
+    const hasApiKey = !!localStorage.getItem('mega_api_key');
 
     $('#cfgProvider').value = provider;
-    updateModelList(provider, data.MODEL_NAME);
+    updateModelList(provider, modelName);
 
     $('#cfgApiKey').value = '';
-    $('#cfgApiKey').placeholder = data.has_api_key ? '••••••• (já configurada)' : 'Insira sua chave de API';
+    $('#cfgApiKey').placeholder = hasApiKey ? '••••••• (já configurada no navegador)' : 'Insira sua chave de API';
   } catch (e) {
     showToast('Não foi possível carregar configurações');
   }
 }
 
 async function saveConfig() {
-  const payload = {
-    MODEL_PROVIDER: $('#cfgProvider').value,
-    MODEL_NAME: $('#cfgModel').value,
-  };
+  const provider = $('#cfgProvider').value;
+  const modelName = $('#cfgModel').value;
   const apiKey = $('#cfgApiKey').value.trim();
-  if (apiKey) payload.API_KEY = apiKey;
 
+  localStorage.setItem('mega_provider', provider);
+  localStorage.setItem('mega_model_name', modelName);
+  
+  if (apiKey) {
+    localStorage.setItem('mega_api_key', apiKey);
+  }
+
+  showToast('Sua chave foi salva com segurança no navegador!');
+  configModal.classList.remove('active');
+  
+  // Send passively to keep backend in sync for this ephemeral session
   try {
-    const res = await fetch(`${API_BASE}/config`, {
+    const payload = { MODEL_PROVIDER: provider, MODEL_NAME: modelName };
+    if (apiKey) payload.API_KEY = apiKey;
+    fetch(`${API_BASE}/config`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    showToast(data.message || 'Configuração salva!');
-    configModal.classList.remove('active');
-  } catch (e) {
-    showToast('Erro ao salvar configuração');
-  }
+      body: JSON.stringify(payload)
+    }).catch(e => {}); 
+  } catch (e) {}
 }
 
 // ── Coupon System ──────────────────────────────────────────────

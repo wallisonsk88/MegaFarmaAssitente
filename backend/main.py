@@ -36,6 +36,9 @@ class ChatRequest(BaseModel):
     message: str = Field(..., max_length=MAX_TEXT_LENGTH)
     history: list[dict] = Field(default_factory=list)
     image: Optional[str] = None  # base64 encoded
+    api_key: Optional[str] = None
+    model_name: Optional[str] = None
+    provider: Optional[str] = None
 
 
 class ConfigUpdate(BaseModel):
@@ -77,13 +80,18 @@ async def chat_endpoint(req: ChatRequest):
         )
 
     config = get_config()
+    
+    req_api_key = req.api_key or config.get("API_KEY", "")
+    req_model_name = req.model_name or config.get("MODEL_NAME", "meta-llama/llama-4-scout-17b-16e-instruct:free")
+    req_provider = req.provider or config.get("MODEL_PROVIDER", "openrouter")
+
     response_text = await ai_chat(
         message=message,
         history=req.history,
         image_b64=image_b64,
-        api_key=config["API_KEY"],
-        model_name=config["MODEL_NAME"],
-        provider=config["MODEL_PROVIDER"],
+        api_key=req_api_key,
+        model_name=req_model_name,
+        provider=req_provider,
     )
 
     return {"response": response_text}
