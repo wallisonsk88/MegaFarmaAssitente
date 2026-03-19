@@ -50,6 +50,7 @@ class TTSRequest(BaseModel):
 
 # ── Endpoints ───────────────────────────────────────────────────────────────────
 
+@app.post("/api/chat")
 @app.post("/chat")
 async def chat_endpoint(req: ChatRequest):
     """Process a chat message through the AI provider."""
@@ -88,6 +89,7 @@ async def chat_endpoint(req: ChatRequest):
     return {"response": response_text}
 
 
+@app.post("/api/tts")
 @app.post("/tts")
 async def tts_endpoint(req: TTSRequest):
     """Generate speech audio from text using Microsoft Neural TTS."""
@@ -104,6 +106,7 @@ async def tts_endpoint(req: TTSRequest):
         return JSONResponse(status_code=500, content={"error": f"Erro ao gerar áudio: {str(e)}"})
 
 
+@app.get("/api/config")
 @app.get("/config")
 async def get_config_endpoint():
     """Return current configuration (without exposing API key)."""
@@ -115,6 +118,7 @@ async def get_config_endpoint():
     }
 
 
+@app.post("/api/config")
 @app.post("/config")
 async def update_config_endpoint(req: ConfigUpdate):
     """Update AI configuration."""
